@@ -71,6 +71,7 @@
 #define LCD_E PORTDbits.RD3
 #define LCD_RS PORTDbits.RD2
 #define LCD_Data4 LATD // eieoeaeecaoey ii?oia D4-D7 LCD
+
 void lcd_clk(void) /*aaia?aoey eiioeuna ia aoia EN*/
 {
   LCD_E = 1;
@@ -158,21 +159,29 @@ int read_Adc()
  while(ADCON0bits.GO_DONE==1);
  return (ADRESH<<2)+(ADRESL>>6);//caienu ?acoeuoaoa i?aia?aciaaiey
  } 
-int h=0;
-int k=0;
+
+volatile int h=0;
+volatile int k=0;
+volatile unsigned char u=0;
+
 void interrupt HIisr (void) 
 { 
     if (INTCONbits.INT0IF) 
     { 
-        __delay_ms(10);// задержка для исключения влияния «дребезга» контактов 
+        __delay_ms(10);// Г§Г Г¤ГҐГ°Г¦ГЄГ  Г¤Г«Гї ГЁГ±ГЄГ«ГѕГ·ГҐГ­ГЁГї ГўГ«ГЁГїГ­ГЁГї В«Г¤Г°ГҐГЎГҐГ§ГЈГ В» ГЄГ®Г­ГІГ ГЄГІГ®Гў 
         __delay_ms(10);         
         __delay_ms(10); 
         if (PORTBbits.RB0==0) 
         { 
-            h=TMR0H<<2;
-            k=TMR0L>>6;
-            k=h+k;
-            inttolcd(0xC0,k); 
+            if(u==0)
+            {
+                T0CONbits.TMR0ON=1;
+                u=1;
+            }
+            else
+            {
+                T0CONbits.TMR0ON=0; 
+            }
         } 
         INTCONbits.INT0IF=0; 
     } 
@@ -180,46 +189,46 @@ void interrupt HIisr (void)
 
 void interrupt low_priority LIisr (void) 
 { 
-    __delay_ms(700);
-    if (INTCONbits.TMR0IF) 
-    { 
-        INTCONbits.TMR0IF=0; 
-        TMR0H=103; 
-        TMR0L=106; 
-        LATBbits.LATB3=!LATBbits.LATB3; 
-    } 
+    h++;
+        if(h==1000)
+        {
+            k++;
+            inttolcd(0xC8,k);
+        }
+    TMR0H=0xFF; 
+    TMR0L=0xF5; 
+    LATBbits.LATB3=!LATBbits.LATB3; 
+    INTCONbits.TMR0IF=0; 
 } 
 
 
 void main(void) { 
     lcd_init();
     inttolcd(0x80,h); 
-    INTCONbits.GIEH=1; //разрешение высокоуровневых прерываний 
-    INTCONbits.GIEL=1; //разрешение низкоуровневых прерываний 
-    TRISBbits.RB3=0;//настройка RB3 на выход 
-    TRISBbits.RB0=1;//настройка RB0 на вход 
-    RCONbits.IPEN=1; // разрешение двухуровневых прерываний 
-    INTCON2bits.INTEDG0=0; //прерывание по ниспадающему фронту сигнала на входе INT0 
-    INTCONbits.INT0IF=0; //обнуление флага прерывания от внешнего источника 
-    INTCONbits.GIEH=1; //разрешение высокоуровневых прерываний 
-    INTCONbits.INT0IE=1;//разрешение прерывания от внешнего источника   
-    TRISBbits.RB3=0;//настройка RB3 на выход 
-    T0CONbits.T08BIT=0;//настройка таймера №0 на 16-битный режим работы 
-    T0CONbits.PSA=0;//разрешение использовать предделитель 
-    T0CONbits.T0PS=0b010;//предделитель равен 8
-    T0CONbits.T0CS=0;//выбор внутреннего источника тактовых импульсов 
-    TMR0H=103;//запись старшего байта начального значения 
-    TMR0L=106;//запись младшего байта начального значения 
-    T0CONbits.TMR0ON=1; 
-    RCONbits.IPEN=1; // разрешение двухуровневых прерываний 
-    INTCON2bits.TMR0IP=0;//присвоение прерыванию низкого приоритета 
-    INTCONbits.TMR0IF=0;//обнуление флага прерывания по переполнению таймера 0 
-    INTCONbits.TMR0IE=1;//разрешение прерывания по переполнению таймера 0 
+    INTCONbits.GIEH=1; //Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ ГўГ»Г±Г®ГЄГ®ГіГ°Г®ГўГ­ГҐГўГ»Гµ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГ© 
+    INTCONbits.GIEL=1; //Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ Г­ГЁГ§ГЄГ®ГіГ°Г®ГўГ­ГҐГўГ»Гµ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГ© 
+    TRISBbits.RB3=0;//Г­Г Г±ГІГ°Г®Г©ГЄГ  RB3 Г­Г  ГўГ»ГµГ®Г¤ 
+    TRISBbits.RB0=1;//Г­Г Г±ГІГ°Г®Г©ГЄГ  RB0 Г­Г  ГўГµГ®Г¤ 
+    RCONbits.IPEN=1; // Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ Г¤ГўГіГµГіГ°Г®ГўГ­ГҐГўГ»Гµ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГ© 
+    INTCON2bits.INTEDG0=0; //ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГҐ ГЇГ® Г­ГЁГ±ГЇГ Г¤Г ГѕГ№ГҐГ¬Гі ГґГ°Г®Г­ГІГі Г±ГЁГЈГ­Г Г«Г  Г­Г  ГўГµГ®Г¤ГҐ INT0 
+    INTCONbits.INT0IF=0; //Г®ГЎГ­ГіГ«ГҐГ­ГЁГҐ ГґГ«Г ГЈГ  ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГї Г®ГІ ГўГ­ГҐГёГ­ГҐГЈГ® ГЁГ±ГІГ®Г·Г­ГЁГЄГ  
+    INTCONbits.GIEH=1; //Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ ГўГ»Г±Г®ГЄГ®ГіГ°Г®ГўГ­ГҐГўГ»Гµ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГ© 
+    INTCONbits.INT0IE=1;//Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГї Г®ГІ ГўГ­ГҐГёГ­ГҐГЈГ® ГЁГ±ГІГ®Г·Г­ГЁГЄГ    
+    TRISBbits.RB3=0;//Г­Г Г±ГІГ°Г®Г©ГЄГ  RB3 Г­Г  ГўГ»ГµГ®Г¤ 
+    T0CONbits.T08BIT=0;//Г­Г Г±ГІГ°Г®Г©ГЄГ  ГІГ Г©Г¬ГҐГ°Г  В№0 Г­Г  16-ГЎГЁГІГ­Г»Г© Г°ГҐГ¦ГЁГ¬ Г°Г ГЎГ®ГІГ» 
+    T0CONbits.PSA=1;//Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ ГЁГ±ГЇГ®Г«ГјГ§Г®ГўГ ГІГј ГЇГ°ГҐГ¤Г¤ГҐГ«ГЁГІГҐГ«Гј 
+    T0CONbits.T0PS=0b010;//ГЇГ°ГҐГ¤Г¤ГҐГ«ГЁГІГҐГ«Гј Г°Г ГўГҐГ­ 8
+    T0CONbits.T0CS=0;//ГўГ»ГЎГ®Г° ГўГ­ГіГІГ°ГҐГ­Г­ГҐГЈГ® ГЁГ±ГІГ®Г·Г­ГЁГЄГ  ГІГ ГЄГІГ®ГўГ»Гµ ГЁГ¬ГЇГіГ«ГјГ±Г®Гў 
+    TMR0H=0xFF; 
+    TMR0L=0xF5;
+    RCONbits.IPEN=1; // Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ Г¤ГўГіГµГіГ°Г®ГўГ­ГҐГўГ»Гµ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГ© 
+    INTCON2bits.TMR0IP=0;//ГЇГ°ГЁГ±ГўГ®ГҐГ­ГЁГҐ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГѕ Г­ГЁГ§ГЄГ®ГЈГ® ГЇГ°ГЁГ®Г°ГЁГІГҐГІГ  
+    INTCONbits.TMR0IF=0;//Г®ГЎГ­ГіГ«ГҐГ­ГЁГҐ ГґГ«Г ГЈГ  ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГї ГЇГ® ГЇГҐГ°ГҐГЇГ®Г«Г­ГҐГ­ГЁГѕ ГІГ Г©Г¬ГҐГ°Г  0 
+    INTCONbits.TMR0IE=1;//Г°Г Г§Г°ГҐГёГҐГ­ГЁГҐ ГЇГ°ГҐГ°Г»ГўГ Г­ГЁГї ГЇГ® ГЇГҐГ°ГҐГЇГ®Г«Г­ГҐГ­ГЁГѕ ГІГ Г©Г¬ГҐГ°Г  0 
     INTCON2bits.RBIP=0;
 
     while(1)
     {
-        inttolcd(0x80,((TMR0H<<2)+(TMR0L>>6)));
-        __delay_ms(100);
+        
     } 
 }    
